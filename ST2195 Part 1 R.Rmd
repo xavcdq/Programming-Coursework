@@ -1,0 +1,95 @@
+# Load necessary libraries for part 1
+library(ggplot2)
+library(extraDistr)
+
+# Define the probability density function f(x)
+f <- function(x) {0.5 * exp(-abs(x))}
+
+# Create a Random Walk Metropolis Algorithm to generate samples and f(x) values
+metropolis_algorithm <- function(N, s, x0) {
+  
+  # Initialize an array to store the generated samples
+  values <- numeric(N)
+  values[1] <- x0
+  
+  # Iterate over the number of samples
+  for (i in 2:N) {
+    # Simulate a random number from the normal distribution
+    random_x <- rnorm(1, mean = values[i-1], sd = s)
+    
+    # Compute the acceptance ratio
+    ratio <- f(random_x) / f(values[i-1])
+    
+    # Generate a random number from the uniform distribution
+    u <- runif(1)
+    
+    # Accept or reject the proposal
+    if (u < ratio) {
+      values[i] <- random_x
+      
+    } else {
+      values[i] <- values[i-1]
+    }
+  }
+  
+  return(values)
+}
+
+# Part 1a
+
+# Parameters
+N <- 10000 # Number of samples
+s <- 1 # Standard deviation of the proposal distribution
+x0 <- 0  # Initial value
+
+# Generate samples using Random Walk Metropolis Algorithm
+samples <- metropolis_algorithm(N, s, x0)
+
+# Plot histogram and kernel density plot
+ggplot() +
+  geom_histogram(aes(x = samples, y = ..density.., fill = "Histogram"), bins = 50, color = "black") +
+  geom_line(aes(x = seq(-5, 5, length.out = N), y = f(seq(-5, 5, length.out = N)), color = "True Density"), size = 1.5) +
+  geom_density(aes(x = samples, color = "Kernel Density"), adjust = 1, size = 1) +
+  scale_fill_manual(values = "white", name = NULL) +
+  scale_color_manual(values = c("blue", "red"), name = NULL) +
+  labs(title = "Random Walk Metropolis", x = "X", y = "Density") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# Print sample mean and standard deviation
+cat(" Sample Mean:", mean(samples), "\n", "Sample Standard Deviation:", sd(samples))
+
+
+# Part 1b
+
+# Create a function to calculate the R hat value
+calc_R <- function(N, s, J) {
+  chains <- matrix(nrow = N, ncol = J)
+  
+  for (j in 1:J) {
+    initial_x <- rnorm(1)  # Random initial value for each chain
+    chains[, j] <- metropolis_algorithm(N, s, x0)
+  }
+  
+  M <- colMeans(chains)
+  V <- apply(chains, 2, function(chain) mean((chain - mean(chain))^2))
+  
+  W <- mean(V)
+  B <- mean((M - mean(M))^2)
+  
+  R <- sqrt((B + W) / W)
+  
+  return(R)
+}
+
+# Parameters
+N <- 2000
+s <- 0.001
+J <- 4
+
+# Compute R hat values for different s values
+s_values <- seq(0.001, 1, length.out = 1000)
+Rhat_values <- sapply(s_values, function(s) calc_R(N, s, J))
+
+# Plot R hat values over s values
+plot(s_values, Rhat_values, type = "p", xlab = "s", ylab = "R hat", main = "R hat values over s values")
